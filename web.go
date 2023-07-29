@@ -116,10 +116,13 @@ func (web *Controller) requestHandler(ctx *fasthttp.RequestCtx) {
 	// Set arbitrary headers
 	ctx.Response.Header.Set("X-Author", "Medet Ahmetson")
 
+	var err error
+	request := message.Request{}
+
 	if !ctx.IsPost() {
 		ctx.SetStatusCode(405)
 
-		reply := message.Fail("only POST method allowed")
+		reply := request.Fail("only POST method allowed")
 		replyMessage, _ := reply.String()
 		_, _ = fmt.Fprintf(ctx, "%s", replyMessage)
 		return
@@ -128,14 +131,14 @@ func (web *Controller) requestHandler(ctx *fasthttp.RequestCtx) {
 	if len(body) == 0 {
 		ctx.SetStatusCode(400)
 
-		reply := message.Fail("empty body")
+		reply := request.Fail("empty body")
 		replyMessage, _ := reply.String()
 		_, _ = fmt.Fprintf(ctx, "%s", replyMessage)
 		return
 	}
 	proxyClient := remote.GetClient(web.extensions, proxy.ControllerName)
 
-	request, err := message.ParseRequest([]string{string(body)})
+	request, err = message.ParseRequest([]string{string(body)})
 	if err != nil {
 		ctx.SetStatusCode(403)
 		_, _ = fmt.Fprintf(ctx, "%s", err.Error())
@@ -163,7 +166,7 @@ func (web *Controller) requestHandler(ctx *fasthttp.RequestCtx) {
 
 	serverReply, err := message.ParseReply(resp)
 	if err != nil {
-		reply := message.Fail("failed to decode server data: " + err.Error())
+		reply := request.Fail("failed to decode server data: " + err.Error())
 		replyMessage, _ := reply.String()
 		ctx.SetStatusCode(403)
 		_, _ = fmt.Fprintf(ctx, "%s", replyMessage)
