@@ -22,7 +22,7 @@ type Controller struct {
 }
 
 func NewWebController(parent *log.Logger) (*Controller, error) {
-	logger := parent.Child("web-controller", true)
+	logger := parent.Child("web-controller")
 
 	webController := Controller{
 		logger:             logger,
@@ -135,7 +135,25 @@ func (web *Controller) requestHandler(ctx *fasthttp.RequestCtx) {
 	}
 	proxyClient := remote.GetClient(web.extensions, proxy.ControllerName)
 
-	resp, err := proxyClient.RequestRawMessage(string(body))
+	request, err := message.ParseRequest([]string{string(body)})
+	if err != nil {
+		ctx.SetStatusCode(403)
+		_, _ = fmt.Fprintf(ctx, "%s", err.Error())
+		return
+	}
+
+	if request.IsFirst() {
+		request.SetUuid()
+	}
+	request.AddRequestStack(web.serviceUrl, web.Config.Name, web.Config.Instances[0].Instance)
+	requestMessage, err := request.String()
+	if err != nil {
+		ctx.SetStatusCode(500)
+		_, _ = fmt.Fprintf(ctx, "%s", err.Error())
+		return
+	}
+
+	resp, err := proxyClient.RequestRawMessage(requestMessage)
 
 	if err != nil {
 		ctx.SetStatusCode(403)
@@ -143,13 +161,17 @@ func (web *Controller) requestHandler(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	fmt.Println(resp)
 	serverReply, err := message.ParseReply(resp)
 	if err != nil {
 		reply := message.Fail("failed to decode server data: " + err.Error())
 		replyMessage, _ := reply.String()
 		ctx.SetStatusCode(403)
 		_, _ = fmt.Fprintf(ctx, "%s", replyMessage)
+	}
+
+	err = serverReply.SetStack(web.serviceUrl, web.Config.Name, web.Config.Instances[0].Instance)
+	if err != nil {
+		web.logger.Warn("failed to add the stack", "reply", serverReply)
 	}
 
 	if serverReply.IsOK() {
