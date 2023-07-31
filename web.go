@@ -62,6 +62,15 @@ func (web *Controller) AddRoute(_ *command.Route) error {
 	return nil
 }
 
+func (web *Controller) Close() error {
+	srv := &fasthttp.Server{}
+	err := srv.Shutdown()
+	if err != nil {
+		return fmt.Errorf("server.Shutdown: %w", err)
+	}
+	return nil
+}
+
 func (web *Controller) ControllerType() configuration.Type {
 	return configuration.ReplierType
 }
@@ -141,7 +150,9 @@ func (web *Controller) requestHandler(ctx *fasthttp.RequestCtx) {
 	request, err = message.ParseRequest([]string{string(body)})
 	if err != nil {
 		ctx.SetStatusCode(403)
-		_, _ = fmt.Fprintf(ctx, "%s", err.Error())
+		reply := request.Fail(err.Error())
+		replyMessage, _ := reply.String()
+		_, _ = fmt.Fprintf(ctx, "%s", replyMessage)
 		return
 	}
 
@@ -152,7 +163,9 @@ func (web *Controller) requestHandler(ctx *fasthttp.RequestCtx) {
 	requestMessage, err := request.String()
 	if err != nil {
 		ctx.SetStatusCode(500)
-		_, _ = fmt.Fprintf(ctx, "%s", err.Error())
+		reply := request.Fail(err.Error())
+		replyMessage, _ := reply.String()
+		_, _ = fmt.Fprintf(ctx, "%s", replyMessage)
 		return
 	}
 
@@ -160,7 +173,9 @@ func (web *Controller) requestHandler(ctx *fasthttp.RequestCtx) {
 
 	if err != nil {
 		ctx.SetStatusCode(403)
-		_, _ = fmt.Fprintf(ctx, "%s", err.Error())
+		reply := request.Fail(err.Error())
+		replyMessage, _ := reply.String()
+		_, _ = fmt.Fprintf(ctx, "%s", replyMessage)
 		return
 	}
 
