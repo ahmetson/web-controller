@@ -2,6 +2,8 @@ github.com/ahmetson/client-lib v0.0.0-20230908063005-a2ac06918e8c h1:xRpRremTHmu
 github.com/ahmetson/client-lib v0.0.0-20230908063005-a2ac06918e8c/go.mod h1:6ZWXLalUMtQKF+BX0ARh/LUNEKpfysW7eXUBoentdQc=
 github.com/ahmetson/client-lib v0.0.0-20230908110757-5f62078bd7bd h1:gUS+DJF7js8sBaRWmG3NCeWj7YGqEx9dBtBLXazqDmw=
 github.com/ahmetson/client-lib v0.0.0-20230908110757-5f62078bd7bd/go.mod h1:EfibUQmfzlHjDsUkBjsjLQ9Bof3i1H54Knv038BgqTA=
+github.com/ahmetson/common-lib v0.0.0-20230825195825-e7b69549b9a1 h1:kcw97M9jxESS9hULBxd/c3Q60VvwYXxxg9wLStINt4g=
+github.com/ahmetson/common-lib v0.0.0-20230825195825-e7b69549b9a1/go.mod h1:33pBXMtRGX5Xseh5t9t9xfo8jaeHNkE3yYyNRdXoY3Y=
 github.com/ahmetson/handler-lib v0.0.0-20230908131929-cc3f442578d3 h1:qjcsn5fdRAdrupE7M8GRzFR+1Y8UbzoGe6Om5HKr0cU=
 github.com/ahmetson/handler-lib v0.0.0-20230908131929-cc3f442578d3/go.mod h1:qjv2saH2N7eViLfDg85YSHvD90hmxVAjokF7NQyLSH8=
 github.com/ahmetson/log-lib v0.0.0-20230908112453-62afbc558b65 h1:2UAputzujw/CHz3AViBZdVSQa5mhuFiydmMy8w7o0gg=

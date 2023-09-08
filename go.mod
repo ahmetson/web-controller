@@ -1,8 +1,6 @@
-module github.com/ahmetson/web-controller
+module github.com/ahmetson/web-lib
 
 go 1.21rc2
-
-replace github.com/ahmetson/common-lib => D:/sds/common-lib
 
 require (
 	github.com/ahmetson/common-lib v0.0.0-20230825195825-e7b69549b9a1
