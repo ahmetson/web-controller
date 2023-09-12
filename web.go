@@ -8,7 +8,6 @@ import (
 	"github.com/ahmetson/common-lib/message"
 	"github.com/ahmetson/handler-lib/base"
 	"github.com/ahmetson/handler-lib/config"
-	"github.com/ahmetson/handler-lib/handler_manager"
 	"github.com/ahmetson/log-lib"
 	"github.com/valyala/fasthttp"
 )
@@ -89,7 +88,7 @@ func (web *Handler) Route(_ string, _ any, _ ...string) error {
 
 // Type returns the base handler type that web extends.
 func (web *Handler) Type() config.HandlerType {
-	return config.ReplierType
+	return web.base.Type()
 }
 
 // Status is not supported.
@@ -98,7 +97,8 @@ func (web *Handler) Status() string {
 }
 
 func (web *Handler) Start() error {
-	if web.base.Config() == nil {
+	instanceConfig := web.base.Config()
+	if instanceConfig == nil {
 		return fmt.Errorf("no config")
 	}
 
@@ -110,19 +110,17 @@ func (web *Handler) Start() error {
 		return fmt.Errorf("destination config not initiated. call SetDestination first")
 	}
 
+	// Web runs on http protocol only
+	if instanceConfig.Port == 0 {
+		return fmt.Errorf("only tcp channels supported. Port is not set")
+	}
+
 	if err := web.setRoutes(); err != nil {
 		return fmt.Errorf("web.setRoutes: %w", err)
 	}
-	if err := web.base.Manager.Start(); err != nil {
-		return fmt.Errorf("web.base.Manager.Start: %w", err)
-	}
 
-	instanceConfig := web.base.Config()
-	if instanceConfig.Port == 0 {
-		web.logger.Fatal("instance port is invalid",
-			"controller", instanceConfig.Id,
-			"port", instanceConfig.Port,
-		)
+	if err := web.base.Start(); err != nil {
+		return fmt.Errorf("web.base.Start: %w", err)
 	}
 
 	addr := fmt.Sprintf(":%d", instanceConfig.Port)
