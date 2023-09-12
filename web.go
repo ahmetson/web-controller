@@ -92,11 +92,12 @@ func (web *Handler) Type() config.HandlerType {
 	return config.ReplierType
 }
 
+// Status is not supported.
 func (web *Handler) Status() string {
 	return ""
 }
 
-// setRoutes sets the default command handlers
+// setRoutes sets the default command handlers for the manager
 func (web *Handler) setRoutes() error {
 	// Requesting status which is calculated from statuses of the handler parts
 	onStatus := func(req message.Request) message.Reply {
