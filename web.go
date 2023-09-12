@@ -14,6 +14,7 @@ import (
 
 type Handler struct {
 	base               *base.Handler
+	pairConfig         *config.Handler // The zeromq socket of the handler turned into the pair socket
 	serviceUrl         string
 	logger             *log.Logger
 	requiredExtensions []string
@@ -41,14 +42,31 @@ func (web *Handler) Config() *config.Handler {
 	return web.base.Config()
 }
 
+func (web *Handler) PairConfig() *config.Handler {
+	return web.pairConfig
+}
+
 func (web *Handler) SetDestination(destination *clientConfig.Client) {
 	web.destinationConfig = destination
+}
+
+func (web *Handler) setPairConfig(handler *config.Handler) {
+	pairConfig := &config.Handler{
+		Type:           config.PairType,
+		Category:       handler.Category + "_pair",
+		Id:             handler.Id + "_pair",
+		InstanceAmount: handler.InstanceAmount,
+		Port:           0,
+	}
+	web.pairConfig = pairConfig
+	web.base.Frontend.SetConfig(web.pairConfig)
 }
 
 // SetConfig adds the parameters of the handler from the config.
 func (web *Handler) SetConfig(handler *config.Handler) {
 	handler.Type = config.ReplierType
 	web.base.SetConfig(handler)
+	web.setPairConfig(handler)
 }
 
 func (web *Handler) close() error {
