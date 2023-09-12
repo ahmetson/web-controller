@@ -3,6 +3,7 @@ module github.com/ahmetson/web-lib
 go 1.21rc2
 
 require (
+	github.com/ahmetson/client-lib v0.0.0-20230908110757-5f62078bd7bd
 	github.com/ahmetson/common-lib v0.0.0-20230825195825-e7b69549b9a1
 	github.com/ahmetson/handler-lib v0.0.0-20230908131929-cc3f442578d3
 	github.com/ahmetson/log-lib v0.0.0-20230908112453-62afbc558b65
@@ -10,7 +11,6 @@ require (
 )
 
 require (
-	github.com/ahmetson/client-lib v0.0.0-20230908110757-5f62078bd7bd // indirect
 	github.com/ahmetson/os-lib v0.0.0-20230908110839-83535270d872 // indirect
 	github.com/andybalholm/brotli v1.0.5 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
