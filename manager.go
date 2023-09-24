@@ -70,31 +70,31 @@ func (web *Handler) setRoutes() error {
 		return req.Ok(params)
 	}
 
-	if err := web.base.Manager.Route(config.HandlerStatus, onStatus); err != nil {
+	if err := web.Handler.Manager.Route(config.HandlerStatus, onStatus); err != nil {
 		return fmt.Errorf("overwriting handler manager '%s' failed: %w", config.HandlerStatus, err)
 	}
-	if err := web.base.Manager.Route(config.ClosePart, onClosePart); err != nil {
+	if err := web.Handler.Manager.Route(config.ClosePart, onClosePart); err != nil {
 		return fmt.Errorf("overwriting handler manager '%s' failed: %w", config.ClosePart, err)
 	}
-	if err := web.base.Manager.Route(config.RunPart, onRunPart); err != nil {
+	if err := web.Handler.Manager.Route(config.RunPart, onRunPart); err != nil {
 		return fmt.Errorf("overwriting handler manager '%s' failed: %w", config.RunPart, err)
 	}
-	if err := web.base.Manager.Route(config.InstanceAmount, onInstanceAmount); err != nil {
+	if err := web.Handler.Manager.Route(config.InstanceAmount, onInstanceAmount); err != nil {
 		return fmt.Errorf("overwriting handler manager '%s' failed: %w", config.InstanceAmount, err)
 	}
-	if err := web.base.Manager.Route(config.MessageAmount, onMessageAmount); err != nil {
+	if err := web.Handler.Manager.Route(config.MessageAmount, onMessageAmount); err != nil {
 		return fmt.Errorf("overwriting handler manager '%s' failed: %w", config.MessageAmount, err)
 	}
-	if err := web.base.Manager.Route(config.AddInstance, onAddInstance); err != nil {
+	if err := web.Handler.Manager.Route(config.AddInstance, onAddInstance); err != nil {
 		return fmt.Errorf("overwriting handler manager '%s' failed: %w", config.AddInstance, err)
 	}
-	if err := web.base.Manager.Route(config.DeleteInstance, onDeleteInstance); err != nil {
+	if err := web.Handler.Manager.Route(config.DeleteInstance, onDeleteInstance); err != nil {
 		return fmt.Errorf("overwriting handler manager '%s' failed: %w", config.DeleteInstance, err)
 	}
-	if err := web.base.Manager.Route(config.Parts, onParts); err != nil {
+	if err := web.Handler.Manager.Route(config.Parts, onParts); err != nil {
 		return fmt.Errorf("overwriting handler manager '%s' failed: %w", config.Parts, err)
 	}
-	if err := web.base.Manager.Route(config.HandlerClose, onClose); err != nil {
+	if err := web.Handler.Manager.Route(config.HandlerClose, onClose); err != nil {
 		return fmt.Errorf("overwriting handler manager '%s' failed: %w", config.HandlerClose, err)
 	}
 
