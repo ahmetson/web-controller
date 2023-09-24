@@ -8,6 +8,7 @@ import (
 	"github.com/ahmetson/common-lib/message"
 	"github.com/ahmetson/handler-lib/config"
 	"github.com/ahmetson/handler-lib/frontend"
+	"github.com/ahmetson/handler-lib/handler_manager"
 	"github.com/ahmetson/handler-lib/instance_manager"
 	"github.com/ahmetson/handler-lib/manager_client"
 	"github.com/ahmetson/log-lib"
@@ -97,8 +98,8 @@ func (test *TestWebSuite) SetupTest() {
 	}
 }
 
-// Test_14_Start starts the handler.
-func (test *TestWebSuite) Test_14_Start() {
+// Test_10_Start starts the handler.
+func (test *TestWebSuite) Test_10_Start() {
 	s := &test.Suite
 
 	s.Require().False(test.webHandler.running)
@@ -118,7 +119,6 @@ func (test *TestWebSuite) Test_14_Start() {
 	test.sendPostRequest("command_1")
 
 	// Now let's close it
-	fmt.Printf("%v\n", *test.webConfig)
 	managerClient, err := manager_client.New(test.webConfig)
 	s.Require().NoError(err)
 	s.Require().NoError(managerClient.Close())
@@ -129,6 +129,62 @@ func (test *TestWebSuite) Test_14_Start() {
 	s.Require().Equal(test.webHandler.InstanceManager.Status(), instance_manager.Idle)
 	s.Require().Equal(test.webHandler.Frontend.Status(), frontend.CREATED)
 	s.Require().False(test.webHandler.running)
+}
+
+// Test_11_Manage tests closing and starting the web layer multiple time from the handler
+func (test *TestWebSuite) Test_11_Manage() {
+	s := &test.Suite
+
+	s.Require().False(test.webHandler.running)
+
+	err := test.webHandler.Start()
+	s.Require().NoError(err)
+
+	// Wait a bit for initialization
+	time.Sleep(time.Millisecond * 100)
+	s.Require().NoError(test.webHandler.status)
+
+	// Make sure that everything works
+	s.Require().Equal(test.webHandler.InstanceManager.Status(), instance_manager.Running)
+	s.Require().Equal(test.webHandler.Frontend.Status(), frontend.RUNNING)
+	s.Require().True(test.webHandler.running)
+
+	// Now let's close it
+	managerClient, err := manager_client.New(test.webConfig)
+	s.Require().NoError(err)
+	s.Require().NoError(managerClient.ClosePart("layer"))
+
+	// Wait a bit for closing handler threads
+	time.Sleep(time.Millisecond * 100)
+	s.Require().False(test.webHandler.running)
+
+	// Handler must be uncompleted
+	handlerStatus, _, err := managerClient.HandlerStatus()
+	s.Require().NoError(err)
+	s.Require().Equal(handler_manager.Incomplete, handlerStatus)
+
+	// try to run the layer
+	s.Require().NoError(managerClient.RunPart("layer"))
+
+	// Wait a bit for running the web thread
+	time.Sleep(time.Millisecond * 100)
+	s.Require().True(test.webHandler.running)
+
+	// Make sure that parts return the layer as well
+	parts, _, err := managerClient.Parts()
+	s.Require().NoError(err)
+	s.Require().Contains(parts, "layer")
+
+	// Make sure that handler is ready
+	handlerStatus, _, err = managerClient.HandlerStatus()
+	s.Require().NoError(err)
+	s.Require().Equal(handler_manager.Ready, handlerStatus)
+
+	// Now close all parts
+	s.Require().NoError(managerClient.Close())
+
+	// Wait a bit for closing all threads
+	time.Sleep(time.Millisecond * 100)
 }
 
 func (test *TestWebSuite) sendPostRequest(cmd string) {

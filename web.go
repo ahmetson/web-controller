@@ -27,7 +27,11 @@ func (web *Handler) closeWeb() error {
 		return nil
 	}
 
-	if err := (&fasthttp.Server{}).Shutdown(); err != nil {
+	if web.layer == nil {
+		return fmt.Errorf("layer not set")
+	}
+
+	if err := web.layer.Shutdown(); err != nil {
 		return fmt.Errorf("server.Shutdown: %w", err)
 	}
 
@@ -44,8 +48,13 @@ func (web *Handler) startWeb() {
 		web.running = true
 		web.status = nil
 
-		if err := fasthttp.ListenAndServe(addr, web.handleWebRequest); err != nil {
+		web.layer = &fasthttp.Server{
+			Handler: web.handleWebRequest,
+		}
+
+		if err := web.layer.ListenAndServe(addr); err != nil {
 			web.status = fmt.Errorf("error in ListenAndServe: %w at port %d", err, instanceConfig.Port)
+			web.running = false
 		}
 	}()
 }

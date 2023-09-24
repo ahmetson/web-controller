@@ -7,6 +7,7 @@ import (
 	"github.com/ahmetson/handler-lib/config"
 	"github.com/ahmetson/handler-lib/pair"
 	"github.com/ahmetson/log-lib"
+	"github.com/valyala/fasthttp"
 )
 
 type Handler struct {
@@ -16,6 +17,7 @@ type Handler struct {
 	pairClient *client.Socket
 	status     error // the web part status
 	running    bool
+	layer      *fasthttp.Server
 }
 
 func New() (*Handler, error) {
