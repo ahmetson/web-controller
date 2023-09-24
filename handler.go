@@ -3,32 +3,33 @@ package web
 import (
 	"fmt"
 	"github.com/ahmetson/client-lib"
-	clientConfig "github.com/ahmetson/client-lib/config"
 	"github.com/ahmetson/common-lib/data_type/key_value"
 	"github.com/ahmetson/common-lib/message"
 	"github.com/ahmetson/handler-lib/base"
 	"github.com/ahmetson/handler-lib/config"
+	"github.com/ahmetson/handler-lib/pair"
 	"github.com/ahmetson/log-lib"
 	"github.com/valyala/fasthttp"
 )
 
 type Handler struct {
-	base               *base.Handler
+	*base.Handler
 	pairConfig         *config.Handler // The zeromq socket of the handler turned into the pair socket
 	serviceUrl         string
 	logger             *log.Logger
 	requiredExtensions []string
 	extensionConfigs   key_value.KeyValue
 	extensions         []*client.Socket
-	destinationSocket  *client.Socket
-	destinationConfig  *clientConfig.Client
+	pairClient         *client.Socket
+	//destinationSocket  *client.Socket
+	//destinationConfig  *clientConfig.Client
 }
 
 func New() (*Handler, error) {
 	handler := base.New()
 
 	webController := Handler{
-		base:               handler,
+		Handler:            handler,
 		logger:             nil,
 		requiredExtensions: make([]string, 0),
 		extensionConfigs:   key_value.Empty(),
@@ -38,35 +39,18 @@ func New() (*Handler, error) {
 	return &webController, nil
 }
 
-func (web *Handler) Config() *config.Handler {
-	return web.base.Config()
-}
-
 func (web *Handler) PairConfig() *config.Handler {
 	return web.pairConfig
 }
 
-func (web *Handler) SetDestination(destination *clientConfig.Client) {
-	web.destinationConfig = destination
-}
-
-func (web *Handler) setPairConfig(handler *config.Handler) {
-	pairConfig := &config.Handler{
-		Type:           config.PairType,
-		Category:       handler.Category + "_pair",
-		Id:             handler.Id + "_pair",
-		InstanceAmount: handler.InstanceAmount,
-		Port:           0,
-	}
-	web.pairConfig = pairConfig
-	web.base.Frontend.SetConfig(web.pairConfig)
-}
+//func (web *Handler) SetDestination(destination *clientConfig.Client) {
+//	web.destinationConfig = destination
+//}
 
 // SetConfig adds the parameters of the handler from the config.
 func (web *Handler) SetConfig(handler *config.Handler) {
 	handler.Type = config.ReplierType
-	web.base.SetConfig(handler)
-	web.setPairConfig(handler)
+	web.Handler.SetConfig(handler)
 }
 
 func (web *Handler) close() error {
@@ -81,22 +65,7 @@ func (web *Handler) close() error {
 // SetLogger sets the logger.
 func (web *Handler) SetLogger(parent *log.Logger) error {
 	web.logger = parent.Child("web")
-	return web.base.SetLogger(parent)
-}
-
-// AddDepByService adds the config of the dependency. Intended to be called by Service not by developer
-func (web *Handler) AddDepByService(dep *clientConfig.Client) error {
-	return web.base.AddDepByService(dep)
-}
-
-// AddedDepByService returns true if the configuration exists
-func (web *Handler) AddedDepByService(id string) bool {
-	return web.base.AddedDepByService(id)
-}
-
-// DepIds return the list of extension names required by this handler.
-func (web *Handler) DepIds() []string {
-	return web.base.DepIds()
+	return web.Handler.SetLogger(parent)
 }
 
 // Route adds a route along with its handler to this handler
@@ -106,49 +75,58 @@ func (web *Handler) Route(_ string, _ any, _ ...string) error {
 
 // Type returns the base handler type that web extends.
 func (web *Handler) Type() config.HandlerType {
-	return web.base.Type()
-}
-
-// Status is not supported.
-func (web *Handler) Status() string {
-	return web.base.Status()
+	return web.Handler.Type()
 }
 
 func (web *Handler) Start() error {
-	instanceConfig := web.base.Config()
+	instanceConfig := web.Handler.Config()
 	if instanceConfig == nil {
 		return fmt.Errorf("no config")
 	}
 
-	if web.base.Manager == nil {
+	if web.Handler.Manager == nil {
 		return fmt.Errorf("handler manager not initiated. call SetConfig and SetLogger first")
 	}
 
-	if web.destinationConfig == nil {
-		return fmt.Errorf("destination config not initiated. call SetDestination first")
-	}
+	//if web.destinationConfig == nil {
+	//	return fmt.Errorf("destination config not initiated. call SetDestination first")
+	//}
 
 	// Web runs on http protocol only
 	if instanceConfig.Port == 0 {
 		return fmt.Errorf("only tcp channels supported. Port is not set")
 	}
 
+	if err := web.Handler.Frontend.PairExternal(); err != nil {
+		return fmt.Errorf("web.Handler.Frontend.PairExternal: %w", err)
+	}
+	if web.pairClient != nil {
+		if err := web.pairClient.Close(); err != nil {
+			return fmt.Errorf("already initiated pair client close: %w", err)
+		}
+	}
+	pairClient, err := pair.NewClient(instanceConfig)
+	if err != nil {
+		return fmt.Errorf("pair.NewClient(web.base.Config()): %w", err)
+	}
+	web.pairClient = pairClient
+
 	if err := web.setRoutes(); err != nil {
 		return fmt.Errorf("web.setRoutes: %w", err)
 	}
 
-	if err := web.base.Start(); err != nil {
+	if err := web.Handler.Start(); err != nil {
 		return fmt.Errorf("web.base.Start: %w", err)
 	}
 
 	addr := fmt.Sprintf(":%d", instanceConfig.Port)
 
-	socket, err := client.New(web.destinationConfig)
-	if err != nil {
-		return fmt.Errorf("client.New('destination'): %w", err)
-	}
-	web.destinationSocket = socket
-
+	//socket, err := client.New(web.destinationConfig)
+	//if err != nil {
+	//	return fmt.Errorf("client.New('destination'): %w", err)
+	//}
+	//web.destinationSocket = socket
+	//
 	if err := fasthttp.ListenAndServe(addr, web.requestHandler); err != nil {
 		return fmt.Errorf("error in ListenAndServe: %w at port %d", err, instanceConfig.Port)
 	}
@@ -205,7 +183,8 @@ func (web *Handler) requestHandler(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	resp, err := web.destinationSocket.RawRequest(requestMessage)
+	resp, err := web.pairClient.RawRequest(requestMessage)
+	//resp, err := web.destinationSocket.RawRequest(requestMessage)
 
 	if err != nil {
 		ctx.SetStatusCode(403)

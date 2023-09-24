@@ -8,7 +8,7 @@ import (
 	"github.com/ahmetson/handler-lib/handler_manager"
 )
 
-// setRoutes sets the default command handlers for the manager
+// setRoutes sets the default command handlers for the handler manager
 func (web *Handler) setRoutes() error {
 	// Requesting status which is calculated from statuses of the handler parts
 	onStatus := func(req message.Request) message.Reply {
