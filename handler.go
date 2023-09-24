@@ -55,11 +55,6 @@ func (web *Handler) Route(_ string, _ any, _ ...string) error {
 	return fmt.Errorf("unsupported")
 }
 
-// Type returns the base handler type that web extends.
-func (web *Handler) Type() config.HandlerType {
-	return web.Handler.Type()
-}
-
 func (web *Handler) Start() error {
 	instanceConfig := web.Handler.Config()
 	if instanceConfig == nil {
