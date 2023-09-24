@@ -3,7 +3,6 @@ package web
 import (
 	"fmt"
 	"github.com/ahmetson/client-lib"
-	"github.com/ahmetson/common-lib/message"
 	"github.com/ahmetson/handler-lib/base"
 	"github.com/ahmetson/handler-lib/config"
 	"github.com/ahmetson/handler-lib/pair"
@@ -16,6 +15,8 @@ type Handler struct {
 	serviceUrl string
 	logger     *log.Logger
 	pairClient *client.Socket
+	status     error // the web part status
+	running    bool
 }
 
 func New() (*Handler, error) {
@@ -41,6 +42,7 @@ func (web *Handler) close() error {
 	if err != nil {
 		return fmt.Errorf("server.Shutdown: %w", err)
 	}
+
 	return nil
 }
 
@@ -83,91 +85,11 @@ func (web *Handler) Start() error {
 		return fmt.Errorf("web.setRoutes: %w", err)
 	}
 
+	web.startWeb()
+
 	if err := web.Handler.Start(); err != nil {
 		return fmt.Errorf("web.base.Start: %w", err)
 	}
 
-	addr := fmt.Sprintf(":%d", instanceConfig.Port)
-
-	if err := fasthttp.ListenAndServe(addr, web.requestHandler); err != nil {
-		return fmt.Errorf("error in ListenAndServe: %w at port %d", err, instanceConfig.Port)
-	}
-
-	return fmt.Errorf("http server was down")
-}
-
-func (web *Handler) requestHandler(ctx *fasthttp.RequestCtx) {
-	ctx.SetContentType("json/application; charset=utf8")
-
-	// Set arbitrary headers
-	ctx.Response.Header.Set("X-Author", "Medet Ahmetson")
-
-	var err error
-	request := &message.Request{}
-
-	if !ctx.IsPost() {
-		ctx.SetStatusCode(405)
-
-		reply := request.Fail("only POST method allowed")
-		replyMessage, _ := reply.String()
-		_, _ = fmt.Fprintf(ctx, "%s", replyMessage)
-		return
-	}
-	body := ctx.PostBody()
-	if len(body) == 0 {
-		ctx.SetStatusCode(400)
-
-		reply := request.Fail("empty body")
-		replyMessage, _ := reply.String()
-		_, _ = fmt.Fprintf(ctx, "%s", replyMessage)
-		return
-	}
-
-	request, err = message.NewReq([]string{string(body)})
-	if err != nil {
-		ctx.SetStatusCode(403)
-		reply := request.Fail(err.Error())
-		replyMessage, _ := reply.String()
-		_, _ = fmt.Fprintf(ctx, "%s", replyMessage)
-		return
-	}
-
-	if request.IsFirst() {
-		request.SetUuid()
-	}
-	//request.AddRequestStack(web.serviceUrl, web.config.Name, web.config.Instances[0].Instance)
-	requestMessage, err := request.String()
-	if err != nil {
-		ctx.SetStatusCode(500)
-		reply := request.Fail(err.Error())
-		replyMessage, _ := reply.String()
-		_, _ = fmt.Fprintf(ctx, "%s", replyMessage)
-		return
-	}
-
-	resp, err := web.pairClient.RawRequest(requestMessage)
-
-	if err != nil {
-		ctx.SetStatusCode(403)
-		reply := request.Fail(err.Error())
-		replyMessage, _ := reply.String()
-		_, _ = fmt.Fprintf(ctx, "%s", replyMessage)
-		return
-	}
-
-	serverReply, err := message.ParseReply(resp)
-	if err != nil {
-		reply := request.Fail("failed to decode server data: " + err.Error())
-		replyMessage, _ := reply.String()
-		ctx.SetStatusCode(403)
-		_, _ = fmt.Fprintf(ctx, "%s", replyMessage)
-	}
-
-	if serverReply.IsOK() {
-		ctx.SetStatusCode(200)
-	} else {
-		ctx.SetStatusCode(403)
-	}
-	replyMessage, _ := serverReply.String()
-	_, _ = fmt.Fprintf(ctx, "%s", replyMessage)
+	return nil
 }
