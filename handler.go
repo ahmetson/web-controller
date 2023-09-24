@@ -50,11 +50,6 @@ func (web *Handler) SetLogger(parent *log.Logger) error {
 	return web.Handler.SetLogger(parent)
 }
 
-// Route adds a route along with its handler to this handler
-func (web *Handler) Route(_ string, _ any, _ ...string) error {
-	return fmt.Errorf("unsupported")
-}
-
 func (web *Handler) Start() error {
 	instanceConfig := web.Handler.Config()
 	if instanceConfig == nil {
