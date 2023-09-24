@@ -118,6 +118,7 @@ func (test *TestWebSuite) Test_14_Start() {
 	test.sendPostRequest("command_1")
 
 	// Now let's close it
+	fmt.Printf("%v\n", *test.webConfig)
 	managerClient, err := manager_client.New(test.webConfig)
 	s.Require().NoError(err)
 	s.Require().NoError(managerClient.Close())
@@ -125,11 +126,9 @@ func (test *TestWebSuite) Test_14_Start() {
 	// Wait a bit for closing handler threads
 	time.Sleep(time.Millisecond * 100)
 
-	// Make sure that everything is closed
-	// the handler manager routes are over-written.
-	// But they don't close the parts yet.
-	//s.Require().Equal(test.webHandler.InstanceManager.Status(), instance_manager.Idle)
-	//s.Require().Equal(test.webHandler.Frontend.Status(), frontend.CREATED)
+	s.Require().Equal(test.webHandler.InstanceManager.Status(), instance_manager.Idle)
+	s.Require().Equal(test.webHandler.Frontend.Status(), frontend.CREATED)
+	s.Require().False(test.webHandler.running)
 }
 
 func (test *TestWebSuite) sendPostRequest(cmd string) {

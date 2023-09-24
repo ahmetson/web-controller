@@ -6,6 +6,11 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
+const (
+	LayerRunning = "running"
+	LayerClosed  = "closed"
+)
+
 var onlyPostMethod, _ = (&message.Request{}).Fail("only POST method allowed").String()
 var emptyBody, _ = (&message.Request{}).Fail("empty body").String()
 
@@ -25,6 +30,9 @@ func (web *Handler) closeWeb() error {
 	if err := (&fasthttp.Server{}).Shutdown(); err != nil {
 		return fmt.Errorf("server.Shutdown: %w", err)
 	}
+
+	web.running = false
+
 	return nil
 }
 
@@ -34,6 +42,8 @@ func (web *Handler) startWeb() {
 
 	go func() {
 		web.running = true
+		web.status = nil
+
 		if err := fasthttp.ListenAndServe(addr, web.handleWebRequest); err != nil {
 			web.status = fmt.Errorf("error in ListenAndServe: %w at port %d", err, instanceConfig.Port)
 		}

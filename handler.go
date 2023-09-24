@@ -7,7 +7,6 @@ import (
 	"github.com/ahmetson/handler-lib/config"
 	"github.com/ahmetson/handler-lib/pair"
 	"github.com/ahmetson/log-lib"
-	"github.com/valyala/fasthttp"
 )
 
 type Handler struct {
@@ -34,16 +33,6 @@ func New() (*Handler, error) {
 func (web *Handler) SetConfig(handler *config.Handler) {
 	handler.Type = config.ReplierType
 	web.Handler.SetConfig(handler)
-}
-
-func (web *Handler) close() error {
-	srv := &fasthttp.Server{}
-	err := srv.Shutdown()
-	if err != nil {
-		return fmt.Errorf("server.Shutdown: %w", err)
-	}
-
-	return nil
 }
 
 // SetLogger sets the logger.
