@@ -21,8 +21,6 @@ type Handler struct {
 	extensionConfigs   key_value.KeyValue
 	extensions         []*client.Socket
 	pairClient         *client.Socket
-	//destinationSocket  *client.Socket
-	//destinationConfig  *clientConfig.Client
 }
 
 func New() (*Handler, error) {
@@ -42,10 +40,6 @@ func New() (*Handler, error) {
 func (web *Handler) PairConfig() *config.Handler {
 	return web.pairConfig
 }
-
-//func (web *Handler) SetDestination(destination *clientConfig.Client) {
-//	web.destinationConfig = destination
-//}
 
 // SetConfig adds the parameters of the handler from the config.
 func (web *Handler) SetConfig(handler *config.Handler) {
@@ -88,10 +82,6 @@ func (web *Handler) Start() error {
 		return fmt.Errorf("handler manager not initiated. call SetConfig and SetLogger first")
 	}
 
-	//if web.destinationConfig == nil {
-	//	return fmt.Errorf("destination config not initiated. call SetDestination first")
-	//}
-
 	// Web runs on http protocol only
 	if instanceConfig.Port == 0 {
 		return fmt.Errorf("only tcp channels supported. Port is not set")
@@ -121,12 +111,6 @@ func (web *Handler) Start() error {
 
 	addr := fmt.Sprintf(":%d", instanceConfig.Port)
 
-	//socket, err := client.New(web.destinationConfig)
-	//if err != nil {
-	//	return fmt.Errorf("client.New('destination'): %w", err)
-	//}
-	//web.destinationSocket = socket
-	//
 	if err := fasthttp.ListenAndServe(addr, web.requestHandler); err != nil {
 		return fmt.Errorf("error in ListenAndServe: %w at port %d", err, instanceConfig.Port)
 	}
@@ -184,7 +168,6 @@ func (web *Handler) requestHandler(ctx *fasthttp.RequestCtx) {
 	}
 
 	resp, err := web.pairClient.RawRequest(requestMessage)
-	//resp, err := web.destinationSocket.RawRequest(requestMessage)
 
 	if err != nil {
 		ctx.SetStatusCode(403)
@@ -201,11 +184,6 @@ func (web *Handler) requestHandler(ctx *fasthttp.RequestCtx) {
 		ctx.SetStatusCode(403)
 		_, _ = fmt.Fprintf(ctx, "%s", replyMessage)
 	}
-
-	//err = serverReply.SetStack(web.serviceUrl, web.config.Name, web.config.Instances[0].Instance)
-	//if err != nil {
-	//	web.logger.Warn("failed to add the stack," "reply", serverReply)
-	//}
 
 	if serverReply.IsOK() {
 		ctx.SetStatusCode(200)
