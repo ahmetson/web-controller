@@ -3,7 +3,6 @@ package web
 import (
 	"fmt"
 	"github.com/ahmetson/client-lib"
-	"github.com/ahmetson/common-lib/data_type/key_value"
 	"github.com/ahmetson/common-lib/message"
 	"github.com/ahmetson/handler-lib/base"
 	"github.com/ahmetson/handler-lib/config"
@@ -14,23 +13,17 @@ import (
 
 type Handler struct {
 	*base.Handler
-	serviceUrl         string
-	logger             *log.Logger
-	requiredExtensions []string
-	extensionConfigs   key_value.KeyValue
-	extensions         []*client.Socket
-	pairClient         *client.Socket
+	serviceUrl string
+	logger     *log.Logger
+	pairClient *client.Socket
 }
 
 func New() (*Handler, error) {
 	handler := base.New()
 
 	webController := Handler{
-		Handler:            handler,
-		logger:             nil,
-		requiredExtensions: make([]string, 0),
-		extensionConfigs:   key_value.Empty(),
-		extensions:         make([]*client.Socket, 0),
+		Handler: handler,
+		logger:  nil,
 	}
 
 	return &webController, nil
