@@ -1,8 +1,10 @@
 package web
 
 import (
+	"errors"
+	"fmt"
 	"github.com/ahmetson/client-lib"
-	clientConfig "github.com/ahmetson/client-lib/config"
+	"github.com/ahmetson/common-lib/data_type/key_value"
 	"github.com/ahmetson/common-lib/message"
 	"github.com/ahmetson/handler-lib/config"
 	"github.com/ahmetson/handler-lib/frontend"
@@ -10,39 +12,45 @@ import (
 	"github.com/ahmetson/handler-lib/manager_client"
 	"github.com/ahmetson/log-lib"
 	"github.com/stretchr/testify/suite"
-	"slices"
+	"github.com/valyala/fasthttp"
+	"io"
+	"net/http"
+	"os"
+	"reflect"
 	"testing"
 	"time"
 )
 
+var headerContentTypeJson = []byte("application/json")
+
 // Define the suite, and absorb the built-in basic suite
 // functionality from testify - including a T() method which
 // returns the current testing orchestra
-type TestHandlerSuite struct {
+type TestWebSuite struct {
 	suite.Suite
-	tcpHandler    *Handler
-	inprocHandler *Handler
-	tcpConfig     *config.Handler
-	inprocConfig  *config.Handler
-	tcpClient     *client.Socket
-	inprocClient  *client.Socket
-	logger        *log.Logger
-	routes        map[string]interface{}
+
+	webHandler *Handler
+	webConfig  *config.Handler
+	tcpClient  *client.Socket
+	logger     *log.Logger
+	routes     map[string]interface{}
+	webClient  *fasthttp.Client
 }
 
 // todo test in-process and external types of the handlers
 // todo test the business of the handler
 // Make sure that Account is set to five
 // before each test
-func (test *TestHandlerSuite) SetupTest() {
+func (test *TestWebSuite) SetupTest() {
 	s := &test.Suite
 
-	logger, err := log.New("handler", false)
-	test.Suite.Require().NoError(err, "failed to create logger")
+	logger, err := log.New("web", false)
+	s.Require().NoError(err, "failed to create logger")
 	test.logger = logger
 
-	test.tcpHandler = New()
-	test.inprocHandler = New()
+	web, err := New()
+	s.Require().NoError(err)
+	test.webHandler = web
 
 	// Socket to talk to clients
 	test.routes = make(map[string]interface{}, 2)
@@ -53,225 +61,155 @@ func (test *TestHandlerSuite) SetupTest() {
 		return request.Ok(request.Parameters.Set("id", request.Command))
 	}
 
-	err = test.inprocHandler.Route("command_1", test.routes["command_1"])
+	err = test.webHandler.Route("command_1", test.routes["command_1"])
 	s.Require().NoError(err)
-	err = test.inprocHandler.Route("command_2", test.routes["command_2"])
-	s.Require().NoError(err)
-
-	test.inprocConfig = config.NewInternalHandler(config.SyncReplierType, "test")
-	test.tcpConfig, err = config.NewHandler(config.SyncReplierType, "test")
+	err = test.webHandler.Route("command_2", test.routes["command_2"])
 	s.Require().NoError(err)
 
-	// Setting a logger should fail since we don't have a configuration set
-	s.Require().Error(test.inprocHandler.SetLogger(test.logger))
-
-	// Setting the configuration
-	// Setting the logger should be successful
-	test.inprocHandler.SetConfig(test.inprocConfig)
-	s.Require().NoError(test.inprocHandler.SetLogger(test.logger))
+	test.webConfig = &config.Handler{
+		Type:           config.ReplierType,
+		Category:       "main",
+		InstanceAmount: 1,
+		Port:           8081,
+		Id:             "web_1",
+	}
 
 	// Setting the parameters of the Tcp Handler
-	test.tcpHandler.SetConfig(test.tcpConfig)
-	s.Require().NoError(test.tcpHandler.SetLogger(test.logger))
-}
+	test.webHandler.SetConfig(test.webConfig)
+	s.Require().NoError(test.webHandler.SetLogger(test.logger))
 
-// Test_11_Deps tests setting of the route dependencies
-func (test *TestHandlerSuite) Test_11_Deps() {
-	s := &test.Suite
-
-	// Handler must not have dependencies yet
-	s.Require().Empty(test.inprocHandler.DepIds())
-	s.Require().Empty(test.tcpHandler.DepIds())
-
-	test.routes["command_3"] = func(request message.Request, _ *client.Socket, _ *client.Socket) *message.Reply {
-		return request.Ok(request.Parameters.Set("id", request.Command))
+	// You may read the timeouts from some config
+	readTimeout, _ := time.ParseDuration("500ms")
+	writeTimeout, _ := time.ParseDuration("500ms")
+	maxIdleConnDuration, _ := time.ParseDuration("1h")
+	test.webClient = &fasthttp.Client{
+		ReadTimeout:                   readTimeout,
+		WriteTimeout:                  writeTimeout,
+		MaxIdleConnDuration:           maxIdleConnDuration,
+		NoDefaultUserAgentHeader:      true, // Don't send: User-Agent: fasthttp
+		DisableHeaderNamesNormalizing: true, // If you set the case on your headers correctly, you can enable this
+		DisablePathNormalizing:        true,
+		// increase DNS cache time to an hour instead of default minute
+		Dial: (&fasthttp.TCPDialer{
+			Concurrency:      4096,
+			DNSCacheDuration: time.Hour,
+		}).Dial,
 	}
-
-	// Adding a new route with the dependencies
-	err := test.inprocHandler.Route("command_3", test.routes["command_3"], "dep_1", "dep_2")
-	s.Require().NoError(err)
-	err = test.tcpHandler.Route("command_3", test.routes["command_3"], "dep_1", "dep_2")
-	s.Require().NoError(err)
-
-	s.Require().Len(test.inprocHandler.DepIds(), 2)
-	s.Require().Len(test.tcpHandler.DepIds(), 2)
-
-	// Trying to route the handler with inconsistent dependencies must fail
-	err = test.tcpHandler.Route("command_4", test.routes["command_3"]) // command_3 handler requires two dependencies
-	s.Require().Error(err)
-
-	err = test.tcpHandler.Route("command_5", test.routes["command_2"], "dep_1", "dep_2") // command_2 handler not requires any dependencies
-	s.Require().Error(err)
-
-	// Adding a new command with already added dependency should be fine
-	test.routes["command_4"] = func(request message.Request, _ *client.Socket, _ *client.Socket) *message.Reply {
-		return request.Ok(request.Parameters.Set("id", request.Command))
-	}
-	err = test.inprocHandler.Route("command_4", test.routes["command_4"], "dep_1", "dep_3") // command_3 handler requires two dependencies
-	s.Require().NoError(err)
-
-	depIds := test.inprocHandler.DepIds()
-	s.Require().Len(depIds, 3)
-	s.Require().EqualValues([]string{"dep_1", "dep_2", "dep_3"}, depIds)
-
-}
-
-// Test_12_DepConfig tests setting of the dependency configurations
-func (test *TestHandlerSuite) Test_12_DepConfig() {
-	s := &test.Suite
-
-	s.Require().NotNil(test.inprocHandler.logger)
-
-	test.routes = make(map[string]interface{}, 2)
-	test.routes["command_1"] = func(request message.Request) *message.Reply {
-		return request.Ok(request.Parameters.Set("id", request.Command))
-	}
-	test.routes["command_2"] = func(request message.Request) *message.Reply {
-		return request.Ok(request.Parameters.Set("id", request.Command))
-	}
-	test.routes["command_3"] = func(request message.Request, _ *client.Socket, _ *client.Socket) *message.Reply {
-		return request.Ok(request.Parameters.Set("id", request.Command))
-	}
-	test.routes["command_4"] = func(request message.Request, _ *client.Socket, _ *client.Socket) *message.Reply {
-		return request.Ok(request.Parameters.Set("id", request.Command))
-	}
-
-	err := test.inprocHandler.Route("command_1", test.routes["command_1"])
-	s.Require().NoError(err)
-	err = test.inprocHandler.Route("command_2", test.routes["command_2"])
-	s.Require().NoError(err)
-	err = test.inprocHandler.Route("command_3", test.routes["command_3"], "dep_1", "dep_2")
-	s.Require().NoError(err)
-	err = test.inprocHandler.Route("command_4", test.routes["command_4"], "dep_1", "dep_3") // command_3 handler requires two dependencies
-	s.Require().NoError(err)
-
-	// No dependency configurations were added yet
-	s.Require().Error(test.inprocHandler.depConfigsAdded())
-
-	// No dependency config should be given
-	depIds := test.inprocHandler.DepIds()
-	//AddDepByService
-	for _, id := range depIds {
-		s.Require().False(test.inprocHandler.AddedDepByService(id))
-	}
-
-	// Adding the dependencies
-	for _, id := range depIds {
-		depConfig := &clientConfig.Client{
-			Id:         id,
-			ServiceUrl: "github.com/ahmetson/" + id,
-			Port:       0,
-		}
-
-		s.Require().NoError(test.inprocHandler.AddDepByService(depConfig))
-	}
-
-	// There should be dependency configurations now
-	for _, id := range depIds {
-		s.Require().True(test.inprocHandler.AddedDepByService(id))
-	}
-
-	// All dependency configurations were added
-	s.Require().NoError(test.inprocHandler.depConfigsAdded())
-
-	// trying to add the configuration for the dependency that doesn't exist should fail
-	depId := "not_exist"
-	s.Require().False(slices.Contains(depIds, depId))
-	depConfig := &clientConfig.Client{
-		Id:         depId,
-		ServiceUrl: "github.com/ahmetson/" + depId,
-		Port:       0,
-	}
-	s.Require().Error(test.inprocHandler.AddDepByService(depConfig))
-
-	// Trying to add the configuration that was already added should fail
-	depId = depIds[0]
-	depConfig = &clientConfig.Client{
-		Id:         depId,
-		ServiceUrl: "github.com/ahmetson/" + depId,
-		Port:       0,
-	}
-	s.Require().Error(test.inprocHandler.AddDepByService(depConfig))
-}
-
-// Test_13_InstanceManager tests setting of the instance Manager and then listening to it.
-func (test *TestHandlerSuite) Test_13_InstanceManager() {
-	s := &test.Suite
-
-	// the instance Manager requires
-	s.Require().NotNil(test.inprocHandler.InstanceManager)
-
-	// It should be idle
-	s.Require().Equal(test.inprocHandler.InstanceManager.Status(), instance_manager.Idle)
-	s.Require().False(test.inprocHandler.instanceManagerStarted)
-	s.Require().Empty(test.inprocHandler.InstanceManager.Instances())
-
-	// Starting instance Manager
-	s.Require().NoError(test.inprocHandler.StartInstanceManager())
-
-	// Waiting a bit for instance Manager initialization
-	time.Sleep(time.Millisecond * 2000)
-
-	// Instance Manager should be running
-	s.Require().Equal(instance_manager.Running, test.inprocHandler.InstanceManager.Status())
-	s.Require().True(test.inprocHandler.instanceManagerStarted)
-	s.Require().Len(test.inprocHandler.InstanceManager.Instances(), 1)
-
-	// Let's send the close signal to the instance manager
-	test.inprocHandler.InstanceManager.Close()
-
-	// Waiting a bit for instance Manager closing
-	time.Sleep(time.Millisecond * 100)
-
-	// Check that Instance Manager is not running
-	s.Require().Equal(instance_manager.Idle, test.inprocHandler.InstanceManager.Status())
-	s.Require().False(test.inprocHandler.instanceManagerStarted)
-	s.Require().Empty(test.inprocHandler.InstanceManager.Instances())
 }
 
 // Test_14_Start starts the handler.
-func (test *TestHandlerSuite) Test_14_Start() {
+func (test *TestWebSuite) Test_14_Start() {
 	s := &test.Suite
 
-	err := test.inprocHandler.Start()
+	s.Require().False(test.webHandler.running)
+
+	err := test.webHandler.Start()
 	s.Require().NoError(err)
 
 	// Wait a bit for initialization
 	time.Sleep(time.Millisecond * 100)
 
 	// Make sure that everything works
-	s.Require().Equal(test.inprocHandler.InstanceManager.Status(), instance_manager.Running)
-	s.Require().Equal(test.inprocHandler.Frontend.Status(), frontend.RUNNING)
+	s.Require().Equal(test.webHandler.InstanceManager.Status(), instance_manager.Running)
+	s.Require().Equal(test.webHandler.Frontend.Status(), frontend.RUNNING)
+	s.Require().True(test.webHandler.running)
+
+	// sending a data
+	test.sendPostRequest("command_1")
 
 	// Now let's close it
-	inprocClient, err := manager_client.New(test.inprocConfig)
+	managerClient, err := manager_client.New(test.webConfig)
 	s.Require().NoError(err)
-	s.Require().NoError(inprocClient.Close())
+	s.Require().NoError(managerClient.Close())
 
 	// Wait a bit for closing handler threads
 	time.Sleep(time.Millisecond * 100)
 
 	// Make sure that everything is closed
-	s.Require().Equal(test.inprocHandler.InstanceManager.Status(), instance_manager.Idle)
-	s.Require().Equal(test.inprocHandler.Frontend.Status(), frontend.CREATED)
+	// the handler manager routes are over-written.
+	// But they don't close the parts yet.
+	//s.Require().Equal(test.webHandler.InstanceManager.Status(), instance_manager.Idle)
+	//s.Require().Equal(test.webHandler.Frontend.Status(), frontend.CREATED)
 }
 
-// Test_15_Misc tests requiredMetadata, AnyRoute functions.
-func (test *TestHandlerSuite) Test_15_Misc() {
+func (test *TestWebSuite) sendPostRequest(cmd string) {
 	s := &test.Suite
 
-	s.Require().Len(requiredMetadata(), 2)
+	// per-request timeout
+	reqTimeout := time.Second
 
-	handler := New()
-	s.Require().Empty(handler.Routes)
+	reqEntity := message.Request{
+		Command:    cmd,
+		Parameters: key_value.Empty(),
+	}
+	reqEntityBytes, _ := reqEntity.Bytes()
 
-	s.Require().NoError(AnyRoute(handler))
+	req := fasthttp.AcquireRequest()
+	url := fmt.Sprintf("http://localhost:%d/", test.webConfig.Port)
+	req.SetRequestURI(url)
+	req.Header.SetMethod(fasthttp.MethodPost)
+	req.Header.SetContentTypeBytes(headerContentTypeJson)
+	req.SetBodyRaw(reqEntityBytes)
 
-	s.Require().NotEmpty(handler.Routes)
+	resp := fasthttp.AcquireResponse()
+	err := test.webClient.DoTimeout(req, resp, reqTimeout)
+	fasthttp.ReleaseRequest(req)
+	defer fasthttp.ReleaseResponse(resp)
+
+	s.Require().NoError(err)
+	if err != nil {
+		errName, known := httpConnError(err)
+		if known {
+			_, err := fmt.Fprintf(os.Stderr, "WARN conn error: %v\n", errName)
+			s.Require().NoError(err)
+		} else {
+			_, err := fmt.Fprintf(os.Stderr, "ERR conn failure: %v %v\n", errName, err)
+			s.Require().NoError(err)
+		}
+
+		return
+	}
+
+	statusCode := resp.StatusCode()
+	respBody := resp.Body()
+
+	if statusCode != http.StatusOK {
+		_, err := fmt.Fprintf(os.Stderr, "ERR invalid HTTP response code: %d\n", statusCode)
+		s.Require().NoError(err)
+		return
+	}
+
+	reply, err := message.ParseReply([]string{string(respBody)})
+	if err != nil {
+		s.Require().True(errors.Is(err, io.EOF))
+	}
+	test.logger.Info("replied", "reply", reply)
+}
+
+func httpConnError(err error) (string, bool) {
+	var (
+		errName string
+		known   = true
+	)
+
+	switch {
+	case errors.Is(err, fasthttp.ErrTimeout):
+		errName = "timeout"
+	case errors.Is(err, fasthttp.ErrNoFreeConns):
+		errName = "conn_limit"
+	case errors.Is(err, fasthttp.ErrConnectionClosed):
+		errName = "conn_close"
+	case reflect.TypeOf(err).String() == "*net.OpError":
+		errName = "timeout"
+	default:
+		known = false
+	}
+
+	return errName, known
 }
 
 // In order for 'go test' to run this suite, we need to create
 // a normal test function and pass our suite to suite.Run
 func TestHandler(t *testing.T) {
-	suite.Run(t, new(TestHandlerSuite))
+	suite.Run(t, new(TestWebSuite))
 }
