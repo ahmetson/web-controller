@@ -11,14 +11,14 @@ import (
 // setRoutes sets the default command handlers for the handler manager
 func (web *Handler) setRoutes() error {
 	// Requesting status which is calculated from statuses of the handler parts
-	onStatus := func(req message.Request) message.Reply {
+	onStatus := func(req message.Request) *message.Reply {
 		params := key_value.Empty()
 		params.Set("status", handler_manager.Ready)
 		return req.Ok(params)
 	}
 
 	// onClose adds a close signal to the queue.
-	onClose := func(req message.Request) message.Reply {
+	onClose := func(req message.Request) *message.Reply {
 		err := web.close()
 		if err != nil {
 			return req.Fail(fmt.Sprintf("web.close: %v", err))
@@ -29,20 +29,20 @@ func (web *Handler) setRoutes() error {
 
 	// Stop one of the parts.
 	// For example, frontend or instance_manager
-	onClosePart := func(req message.Request) message.Reply {
+	onClosePart := func(req message.Request) *message.Reply {
 		return req.Ok(key_value.Empty())
 	}
 
-	onRunPart := func(req message.Request) message.Reply {
+	onRunPart := func(req message.Request) *message.Reply {
 		return req.Ok(key_value.Empty())
 	}
 
-	onInstanceAmount := func(req message.Request) message.Reply {
+	onInstanceAmount := func(req message.Request) *message.Reply {
 		return req.Ok(key_value.Empty().Set("instance_amount", 1))
 	}
 
 	// Returns queue amount and currently processed images amount
-	onMessageAmount := func(req message.Request) message.Reply {
+	onMessageAmount := func(req message.Request) *message.Reply {
 		params := key_value.Empty().
 			Set("queue_length", 0).
 			Set("processing_length", 0)
@@ -50,16 +50,16 @@ func (web *Handler) setRoutes() error {
 	}
 
 	// Add a new instance, but it doesn't check that instance was added
-	onAddInstance := func(req message.Request) message.Reply {
+	onAddInstance := func(req message.Request) *message.Reply {
 		return req.Fail("instance change is not allowed")
 	}
 
 	// Delete the instance
-	onDeleteInstance := func(req message.Request) message.Reply {
+	onDeleteInstance := func(req message.Request) *message.Reply {
 		return req.Fail("instance change is not allowed")
 	}
 
-	onParts := func(req message.Request) message.Reply {
+	onParts := func(req message.Request) *message.Reply {
 		var parts []string
 		var messageTypes []string
 
