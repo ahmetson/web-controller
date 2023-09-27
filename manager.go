@@ -2,8 +2,8 @@ package web
 
 import (
 	"fmt"
-	"github.com/ahmetson/common-lib/data_type/key_value"
-	"github.com/ahmetson/common-lib/message"
+	"github.com/ahmetson/datatype-lib/data_type/key_value"
+	"github.com/ahmetson/datatype-lib/message"
 	"github.com/ahmetson/handler-lib/config"
 	"github.com/ahmetson/handler-lib/frontend"
 	"github.com/ahmetson/handler-lib/handler_manager"
@@ -14,13 +14,13 @@ import (
 func (web *Handler) setRoutes() error {
 	m := web.Handler
 
-	onStatus := func(req message.Request) *message.Reply {
+	onStatus := func(req message.RequestInterface) message.ReplyInterface {
 		partStatuses := m.Manager.PartStatuses()
-		frontendStatus, err := partStatuses.GetString("frontend")
+		frontendStatus, err := partStatuses.StringValue("frontend")
 		if err != nil {
 			return req.Fail(fmt.Sprintf("partStatuses.GetString('frontend'): %v", err))
 		}
-		instanceStatus, err := partStatuses.GetString("instance_manager")
+		instanceStatus, err := partStatuses.StringValue("instance_manager")
 		if err != nil {
 			return req.Fail(fmt.Sprintf("partStatuses.GetString('instance_manager'): %v", err))
 		}
@@ -32,7 +32,7 @@ func (web *Handler) setRoutes() error {
 			layerStatus = LayerClosed
 		}
 
-		params := key_value.Empty()
+		params := key_value.New()
 
 		if frontendStatus == frontend.RUNNING &&
 			instanceStatus == instances.Running &&
@@ -43,15 +43,15 @@ func (web *Handler) setRoutes() error {
 			params.Set("status", handler_manager.Incomplete).
 				Set("parts", partStatuses)
 			if web.status != nil {
-				params.Set("errors", key_value.Empty().Set("layer", web.status.Error()))
+				params.Set("errors", key_value.New().Set("layer", web.status.Error()))
 			}
 		}
 
 		return req.Ok(params)
 	}
 
-	onClosePart := func(req message.Request) *message.Reply {
-		part, err := req.Parameters.GetString("part")
+	onClosePart := func(req message.RequestInterface) message.ReplyInterface {
+		part, err := req.RouteParameters().StringValue("part")
 		if err != nil {
 			return req.Fail(fmt.Sprintf("req.Parameters.GetString('part'): %v", err))
 		}
@@ -63,14 +63,14 @@ func (web *Handler) setRoutes() error {
 				if err := m.Frontend.Close(); err != nil {
 					return req.Fail(fmt.Sprintf("failed to close the frontend: %v", err))
 				}
-				return req.Ok(key_value.Empty())
+				return req.Ok(key_value.New())
 			}
 		} else if part == "instance_manager" {
 			if m.InstanceManager.Status() != instances.Running {
 				return req.Fail("instance manager not running")
 			} else {
 				m.InstanceManager.Close()
-				return req.Ok(key_value.Empty())
+				return req.Ok(key_value.New())
 			}
 		} else if part == "layer" {
 			if !web.running {
@@ -79,13 +79,13 @@ func (web *Handler) setRoutes() error {
 			if err := web.closeWeb(); err != nil {
 				return req.Fail(fmt.Sprintf("web.closeWeb: %v", err))
 			}
-			return req.Ok(key_value.Empty())
+			return req.Ok(key_value.New())
 		} else {
 			return req.Fail(fmt.Sprintf("unknown part '%s' to stop", part))
 		}
 	}
-	onRunPart := func(req message.Request) *message.Reply {
-		part, err := req.Parameters.GetString("part")
+	onRunPart := func(req message.RequestInterface) message.ReplyInterface {
+		part, err := req.RouteParameters().StringValue("part")
 		if err != nil {
 			return req.Fail(fmt.Sprintf("req.Parameters.GetString('part'): %v", err))
 		}
@@ -98,7 +98,7 @@ func (web *Handler) setRoutes() error {
 				if err != nil {
 					return req.Fail(fmt.Sprintf("m.Frontend.Start: %v", err))
 				}
-				return req.Ok(key_value.Empty())
+				return req.Ok(key_value.New())
 			}
 		} else if part == "instance_manager" {
 			if m.InstanceManager.Status() == instances.Running {
@@ -108,7 +108,7 @@ func (web *Handler) setRoutes() error {
 				if err != nil {
 					return req.Fail(fmt.Sprintf("base.StartInstanceManager: %v", err))
 				}
-				return req.Ok(key_value.Empty())
+				return req.Ok(key_value.New())
 			}
 		} else if part == "layer" {
 			if web.running {
@@ -116,13 +116,13 @@ func (web *Handler) setRoutes() error {
 			}
 			web.startWeb()
 
-			return req.Ok(key_value.Empty())
+			return req.Ok(key_value.New())
 		} else {
 			return req.Fail(fmt.Sprintf("unknown part '%s' to stop", part))
 		}
 	}
 
-	onParts := func(req message.Request) *message.Reply {
+	onParts := func(req message.RequestInterface) message.ReplyInterface {
 		parts := []string{
 			"frontend",
 			"instance_manager",
@@ -133,7 +133,7 @@ func (web *Handler) setRoutes() error {
 			"processing_length",
 		}
 
-		params := key_value.Empty().
+		params := key_value.New().
 			Set("parts", parts).
 			Set("message_types", messageTypes)
 

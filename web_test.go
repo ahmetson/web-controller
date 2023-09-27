@@ -4,8 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/ahmetson/client-lib"
-	"github.com/ahmetson/common-lib/data_type/key_value"
-	"github.com/ahmetson/common-lib/message"
+	"github.com/ahmetson/datatype-lib/data_type/key_value"
+	"github.com/ahmetson/datatype-lib/message"
 	"github.com/ahmetson/handler-lib/config"
 	"github.com/ahmetson/handler-lib/frontend"
 	"github.com/ahmetson/handler-lib/handler_manager"
@@ -55,11 +55,11 @@ func (test *TestWebSuite) SetupTest() {
 
 	// Socket to talk to clients
 	test.routes = make(map[string]interface{}, 2)
-	test.routes["command_1"] = func(request message.Request) *message.Reply {
-		return request.Ok(request.Parameters.Set("id", request.Command))
+	test.routes["command_1"] = func(request message.RequestInterface) message.ReplyInterface {
+		return request.Ok(request.RouteParameters().Set("id", request.CommandName()))
 	}
-	test.routes["command_2"] = func(request message.Request) *message.Reply {
-		return request.Ok(request.Parameters.Set("id", request.Command))
+	test.routes["command_2"] = func(request message.RequestInterface) message.ReplyInterface {
+		return request.Ok(request.RouteParameters().Set("id", request.CommandName()))
 	}
 
 	err = test.webHandler.Route("command_1", test.routes["command_1"])
@@ -195,7 +195,7 @@ func (test *TestWebSuite) sendPostRequest(cmd string) {
 
 	reqEntity := message.Request{
 		Command:    cmd,
-		Parameters: key_value.Empty(),
+		Parameters: key_value.New(),
 	}
 	reqEntityBytes, _ := reqEntity.Bytes()
 
@@ -234,7 +234,7 @@ func (test *TestWebSuite) sendPostRequest(cmd string) {
 		return
 	}
 
-	reply, err := message.ParseReply([]string{string(respBody)})
+	reply, err := message.NewRep([]string{string(respBody)})
 	if err != nil {
 		s.Require().True(errors.Is(err, io.EOF))
 	}

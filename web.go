@@ -2,7 +2,7 @@ package web
 
 import (
 	"fmt"
-	"github.com/ahmetson/common-lib/message"
+	"github.com/ahmetson/datatype-lib/message"
 	"github.com/valyala/fasthttp"
 )
 
@@ -11,11 +11,11 @@ const (
 	LayerClosed  = "closed"
 )
 
-var onlyPostMethod, _ = (&message.Request{}).Fail("only POST method allowed").String()
-var emptyBody, _ = (&message.Request{}).Fail("empty body").String()
+var onlyPostMethod = (&message.Request{}).Fail("only POST method allowed").String()
+var emptyBody = (&message.Request{}).Fail("empty body").String()
 
 var errStr = func(err error) (replyStr string) {
-	replyStr, _ = (&message.Request{}).Fail(err.Error()).String()
+	replyStr = (&message.Request{}).Fail(err.Error()).String()
 	return
 }
 
@@ -85,12 +85,7 @@ func (web *Handler) handleWebRequest(ctx *fasthttp.RequestCtx) {
 	}
 	request.SetUuid()
 
-	requestMessage, err := request.String()
-	if err != nil {
-		ctx.SetStatusCode(500)
-		_, _ = fmt.Fprintf(ctx, "%s", errStr(err))
-		return
-	}
+	requestMessage := request.String()
 
 	resp, err := web.pairClient.RawRequest(requestMessage)
 
@@ -100,7 +95,7 @@ func (web *Handler) handleWebRequest(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	serverReply, err := message.ParseReply(resp)
+	serverReply, err := message.NewRep(resp)
 	if err != nil {
 		reply := fmt.Errorf("failed to decode server data: %w", err)
 		ctx.SetStatusCode(403)
@@ -112,6 +107,6 @@ func (web *Handler) handleWebRequest(ctx *fasthttp.RequestCtx) {
 	} else {
 		ctx.SetStatusCode(403)
 	}
-	replyMessage, _ := serverReply.String()
+	replyMessage := serverReply.String()
 	_, _ = fmt.Fprintf(ctx, "%s", replyMessage)
 }
