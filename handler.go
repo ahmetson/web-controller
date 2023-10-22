@@ -20,7 +20,7 @@ type Handler struct {
 	layer      *fasthttp.Server
 }
 
-func New() (*Handler, error) {
+func New() *Handler {
 	handler := base.New()
 
 	webController := Handler{
@@ -28,10 +28,9 @@ func New() (*Handler, error) {
 		logger:  nil,
 	}
 
-	return &webController, nil
+	return &webController
 }
 
-// SetConfig adds the parameters of the handler from the config.
 func (web *Handler) SetConfig(handler *config.Handler) {
 	handler.Type = config.ReplierType
 	web.Handler.SetConfig(handler)
