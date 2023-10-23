@@ -36,6 +36,10 @@ func (web *Handler) SetConfig(handler *config.Handler) {
 	web.Handler.SetConfig(handler)
 }
 
+func (web *Handler) Type() config.HandlerType {
+	return config.ReplierType
+}
+
 // SetLogger sets the logger.
 func (web *Handler) SetLogger(parent *log.Logger) error {
 	web.logger = parent.Child("web")
