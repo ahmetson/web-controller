@@ -49,8 +49,7 @@ func (test *TestWebSuite) SetupTest() {
 	s.Require().NoError(err, "failed to create logger")
 	test.logger = logger
 
-	web, err := New()
-	s.Require().NoError(err)
+	web := New()
 	test.webHandler = web
 
 	// Socket to talk to clients
